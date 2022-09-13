@@ -1,0 +1,242 @@
+
+syntax = "proto3";
+
+package getftr;
+
+/*
+An enum for the access type for a document DOI
+*/
+enum AccessType {
+  /*
+  Indicates this document is paid-for
+  */
+  PAID = 0;
+
+  /*
+  This document is currently free
+
+  Note: this can be temporary and could changed to "PAID" (for example)
+  */
+  FREE = 1;
+
+  /*
+  This document is "Open Access"
+  */
+  OPEN_ACCESS = 2;
+
+  /*
+  This document is permanently free
+  */
+  PERMANENTLY_FREE = 3;
+}
+
+/*
+URL and optional type tuples for a documents Version of Record
+*/
+message VOR {
+  /*
+  The URL for the associated Version of Record
+  */
+  string url = 1;
+
+  /*
+  The type, such as "application/pdf", this field is sometimes
+  omitted if we do not have enough information to determine the type
+  */
+  optional string type = 2;
+}
+
+/*
+Represents an entitlement response for a DOI.
+*/
+message Entitlement {
+  /*
+  The DOI for the document
+  */
+  string doi = 1;
+
+  /*
+  Indicates if the caller has provided an identifier that
+  entitles the user to access the document
+  */
+  bool entitled = 2;
+
+  /*
+  The URL to the document
+  */
+  optional string document = 3;
+
+  /*
+  The associated access type for the document (as described in the AccessType enum)
+  */
+  optional AccessType access_type = 4;
+
+  /*
+  An array of identifiers. Each integer in this array represents
+  the index position for an entitled identifier from the entitlement request
+  */
+  repeated int32 identifiers = 5;
+
+  /*
+  An array of Version of Records for the document
+  */
+  repeated VOR vor = 6;
+
+}
+
+/*
+Represents the request that is sent to check entitlements
+for a specific document
+*/
+message EntitlementRequest {
+  /*
+  Identifies the value being sent inside an Identifier message
+  */
+  enum IdentifierType {
+    /*
+    An internal GetFTR assigned ID for a specific institution
+
+    Note: Normally, you wouldn't want to use this
+    */
+    GETFTR_ID = 0;
+
+    /*
+    An ID a specific publisher has assigned to an institution.
+    Otherwise known as a "BPID"
+    */
+    PUBLISHER_ID = 1;
+
+    /*
+    An IPv4 Address. CIDR is not supported
+    */
+    IPV4 = 2;
+
+    /*
+    An IPv6 Address. CIDR is not supported
+    */
+    IPV6 = 3;
+
+    /*
+    A RingGold ID
+    */
+    RINGGOLD_ID = 4;
+
+    /*
+    An ROR ID
+    */
+    ROR_ID = 5;
+
+    /*
+    A Grid ID
+    */
+    GRID_ID = 6;
+
+    /*
+    An ISNI ID
+    */
+    ISNI = 7;
+
+    /*
+    An institutions Entity ID
+    */
+    ENTITY_ID = 8;
+
+  }
+
+  /*
+  An identifier for an entitlement request. One or more identifiers
+  can be provided.
+
+  @example An IPv4 Identifier
+  ````
+  {
+    "type": "IPV4",
+    "value": "200.46.32.1"
+  }
+  ````
+  */
+  message Identifier {
+    /*
+    The type to assign to the identifier value, such as "IPV4"
+    */
+    IdentifierType type = 1;
+
+    /*
+    The value associated with the provided type, such as "192.168.0.1"
+    */
+    string value = 2;
+  }
+
+  /*
+  One or more identifiers the caller can provide to check if the
+  user is entitled to one or more documents.
+
+  @example Multiple Identifiers
+  ```
+  [
+    {
+      "type": "IPV4",
+      "value": "200.46.32.1"
+    },
+    {
+      "type": "ENTITY_ID",
+      "value": ""
+    },
+    {
+      "type": "PUBLISHER_ID",
+      "value": "1000563214"
+    }
+  ]
+  ```
+  */
+  repeated Identifier identifiers = 1;
+
+  /*
+  A list of DOIs to perform entitlement checks against
+
+  [
+    "10.10/1111",
+    "10.10/2222"
+  ]
+  */
+  repeated string dois = 2;
+
+}
+
+/*
+Message representing the entitlement response.
+
+@example Response check for two DOIs
+```
+{
+  "items": [
+    {
+      "doi": "10.10/2222",
+      "entitled": true,
+      "document": "https://dx.doi.org/10.10/2222",
+      "access_type": "PAID",
+      "identifiers": [0,2],
+      "vor": []
+    }
+  ],
+  "unprocessed": [
+    "10.10/1111"
+  ]
+}
+```
+*/
+message EntitlementResponse {
+  /*
+  The items that have been processed
+  */
+  repeated Entitlement items = 1;
+  /*
+  A list of unprocessed items. This contains a list of DOIs
+  that our system could not find.
+  */
+  repeated string unprocessed = 2;
+}
+
+service EntitlementsService {
+  rpc GetEntitlements(EntitlementRequest) returns (EntitlementResponse) {};
+}
